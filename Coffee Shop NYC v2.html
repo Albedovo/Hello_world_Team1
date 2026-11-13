@@ -270,6 +270,17 @@ const MAP = [
 ];
 const SYR = { A: 'vanilla', K: 'caramel', C: 'choc' };
 const TAG = { H: 'HOT CUPS', J: 'ICED CUPS', X: 'TRASH', E: 'ESPRESSO', F: 'FROTH', Q: 'BAGELS', R: 'CROISSANTS', V: 'OVEN', W: 'WATER', M: 'MILK', A: 'VANILLA', K: 'CARAMEL', C: 'CHOCO', I: 'ICE' };
+// One identity everywhere: numbered machine labels, colored counters and order chips.
+const STATIONS = {
+  H: { id: '01', name: 'HOT CUP', col: '#ffd2bd' }, J: { id: '02', name: 'ICED CUP', col: '#c9e8ff' },
+  E: { id: '03', name: 'ESPRESSO', col: '#e4b99c' }, W: { id: '04', name: 'WATER', col: '#9ed6ed' },
+  M: { id: '05', name: 'MILK', col: '#fff1cf' }, F: { id: '06', name: 'FROTH', col: '#c9b7f3' },
+  I: { id: '07', name: 'ICE', col: '#b6efee' }, A: { id: '08', name: 'VANILLA', col: '#ffe68d' },
+  K: { id: '09', name: 'CARAMEL', col: '#f6bd72' }, C: { id: '10', name: 'CHOCO', col: '#c99c8e' },
+  Q: { id: '11', name: 'BAGEL', col: '#cfe5a4' }, V: { id: '12', name: 'OVEN', col: '#f5b6ca' },
+  R: { id: '13', name: 'CROISSANT', col: '#efcf90' }, X: { id: '14', name: 'TRASH', col: '#d3d1de' },
+};
+
 let grid = [];
 function cellAt(c, r){ if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return null; return grid[r][c]; }
 const cellX = cell => OX + cell.c * TW, cellTop = cell => OY + cell.r * TD - HB;
@@ -293,6 +304,17 @@ const MENU = {
   croissant: { name: 'Warm Croissant', food: 'croissant', price: 20 },
 };
 for (const k in MENU) MENU[k].key = k;
+const LEARNED_KEY = 'coffee-shop-nyc-learned-v1';
+const learnedRecipes = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(LEARNED_KEY) || '[]');
+  if (Array.isArray(saved)) for (const key of saved) if (Object.prototype.hasOwnProperty.call(MENU, key)) learnedRecipes.add(key);
+} catch (e) {} // File URLs/private browsing can still learn for this session.
+const firstRecipe = R => !learnedRecipes.has(R.key);
+function rememberRecipe(R){
+  learnedRecipes.add(R.key);
+  try { localStorage.setItem(LEARNED_KEY, JSON.stringify([...learnedRecipes])); } catch (e) {}
+}
 const POOLS = {
   early: ['latte', 'americano', 'icedlatte', 'bagel', 'latte'],
   afternoon: ['latte', 'cappuccino', 'americano', 'icedlatte', 'vanilla', 'bagel', 'croissant', 'icedamericano', 'icedcaramel'],
@@ -517,9 +539,20 @@ function frontFace(g, x, fy, col, style){
 function paintBox(g, cell, top, front, style){ const x = cellX(cell), fy = OY + cell.r * TD; frontFace(g, x, fy, front, style); rr(g, x + 1, fy - HB, TW - 2, TD, 4); sf(g, top, 2.2); line(g, x + 6, fy - HB + 5, x + TW - 6, fy - HB + 5, 1.2, 'rgba(255,255,255,.8)'); }
 function tag(g, cell, label, col = C.paper, tc = INK){
   const below = cellAt(cell.c, cell.r + 1), hidden = below && below.type !== '.';
-  const x = cellX(cell) + TW / 2, y = hidden ? cellTop(cell) + TD - 10 : OY + cell.r * TD + TD - 12, w = Math.max(40, measure(label, 10) + 12);
-  rr(g, x - w / 2, y - 8, w, 16, 3); sf(g, col, 1.8); txt(g, label, x, y + 0.5, { size: 10, w: 700, color: tc });
+  const x = cellX(cell) + TW / 2, y = hidden ? cellTop(cell) + TD - 10 : OY + cell.r * TD + TD - 12;
+  const station = STATIONS[cell.type];
+  if (station){
+    const w = TW - 4;
+    rr(g, x - w / 2, y - 10, w, 20, 3); sf(g, station.col, 1.8);
+    rr(g, x - w / 2 + 2, y - 8, 17, 16, 3); sf(g, C.paper, 1.2);
+    txt(g, station.id, x - w / 2 + 10.5, y + 0.5, { f: 't', size: 10 });
+    txt(g, station.name, x - w / 2 + 22, y + 0.5, { f: 't', size: fitText(station.name, w - 25, 10, 7), align: 'left' });
+  } else {
+    const w = Math.max(40, measure(label, 10) + 12);
+    rr(g, x - w / 2, y - 8, w, 16, 3); sf(g, col, 1.8); txt(g, label, x, y + 0.5, { size: 10, w: 700, color: tc });
+  }
 }
+
 // decorative props for plain counters
 const DECOR = ['beans', 'plant', 'plates', 'radio', 'cookies', 'napkins', 'cat', 'lemon', 'mugs', 'books', 'register', 'jar'];
 function decor(g, kind, x, y){
@@ -540,7 +573,7 @@ function paintStation(g, cell){
   const t = cell.type, x = cellX(cell), fy = OY + cell.r * TD, ty = fy - HB, a = anchor(cell);
   const fronts = { O: C.red, H: C.yellow, J: C.yellow, Q: C.orange, R: C.orange, V: C.pink, X: C.teal, W: C.tealL, M: C.tealL, E: C.teal, F: C.teal, A: C.yellow, K: C.orange, C: C.pink, I: C.tealL };
   const style = t === 'O' ? 'stripe' : (cell.c + cell.r) % 3 === 0 ? 'drawer' : 'doors';
-  paintBox(g, cell, t === 'O' ? C.wood : '#fdf2dc', fronts[t] || C.teal, style);
+  paintBox(g, cell, t === 'O' ? C.wood : STATIONS[t] ? STATIONS[t].col : '#fdf2dc', STATIONS[t] ? STATIONS[t].col : fronts[t] || C.teal, style);
   if (t === 'O'){
     const k = (cell.c - 2) % 3;
     if (cell.c < 2 || cell.c > 13) decor(g, cell.c === 1 ? 'register' : cell.c === 14 ? 'cookies' : 'plant', a.x, a.y + 4);
@@ -766,6 +799,7 @@ function act(p){
 function serve(p, it, cu){
   const a = { x: slotX(cu.slot), y: CUST_Y };
   if (!complete(it, cu.R)){ pop(a.x, a.y - 120, whyWrong(it, cu.R), C.red, 16, '#fff'); AU.wrong(); return; }
+  rememberRecipe(cu.R);
   const base = cu.R.price, f = cu.pat / cu.max;
   let tip = Math.round(base * 0.5 * f) + (it.pourP ? 5 : 0) + (it.perfect || 0) * 2; if (it.spill) tip = Math.max(0, tip - 5);
   G.combo++; G.best = Math.max(G.best, G.combo);
@@ -810,10 +844,10 @@ function hintFor(p, cu){
     if (R.foam && !h.foam) return G_(one('F'), `Tap ${ak} on the beat: FROTH (${h.frothN || 0}/4)`, ak);
     return G_(one('X'), 'Something is off — toss it', gk);
   }
-  const ready = nearestTo(p, cellsWhere(c => c.type === 'V' && c.item && c.item.state !== 'raw'));
+  const ready = nearestTo(p, cellsWhere(c => c.type === 'V' && c.item && c.item.state !== 'raw' && (!R || fits(c.item, R))));
   if (ready) return G_(ready, ready.item.state === 'burnt' ? 'Burnt! Grab it and toss' : `Grab the warm ${ready.item.kind.toUpperCase()}`, gk);
-  const mach = cellsWhere(c => c.type === 'E' && c.item && c.brew <= 0);
-  for (const m of mach){ const need = waiting().find(c => fits(m.item, c.R) && m.item.shots < c.R.shots); if (need) return G_(m, `Tap ${ak} on the beat: pull a SHOT (${m.item.shots}/${need.R.shots})`, ak); }
+  const mach = cellsWhere(c => c.type === 'E' && c.item && c.brew <= 0 && (!R || fits(c.item, R)));
+  for (const m of mach){ const need = (cu ? [cu] : waiting()).find(c => fits(m.item, c.R) && m.item.shots < c.R.shots); if (need) return G_(m, `Tap ${ak} on the beat: pull a SHOT (${m.item.shots}/${need.R.shots})`, ak); }
   if (mach.length) return G_(nearestTo(p, mach), 'Grab your cup', gk);
   if (!cu) return null;
   if (R.food){ const ov = cellsWhere(c => c.type === 'V' && c.item && c.item.kind === R.food)[0]; if (ov) return G_(ov, 'Baking… start a drink meanwhile', null); return G_(one(R.food === 'bagel' ? 'Q' : 'R'), `Grab a ${R.food.toUpperCase()}`, gk); }
@@ -860,21 +894,22 @@ function playerHints(){
 // An item counts toward at most one order, independent of who holds it.
 function orderSteps(R, it){
   const c = it && fits(it, R) ? it : null, steps = [];
-  const add = (label, done) => steps.push({ label, done: !!done });
+  const add = (type, label, done) => steps.push({ type, station: STATIONS[type], label, done: !!done });
   if (R.food){
-    add('Take ' + R.food, !!c);
-    add(c && c.state === 'raw' && cellsWhere(s => s.type === 'V' && s.item === c).length ? 'Oven: ' + Math.ceil(Math.max(0, BAKE_T - c.t)) + 's left' : 'Bake in oven', c && c.state === 'done');
+    add(R.food === 'bagel' ? 'Q' : 'R', 'Take ' + R.food, !!c);
+    add('V', c && c.state === 'raw' && cellsWhere(s => s.type === 'V' && s.item === c).length ? 'Oven: ' + Math.ceil(Math.max(0, BAKE_T - c.t)) + 's' : 'Bake in OVEN', c && c.state === 'done');
   } else {
-    add(R.kind.toUpperCase() + ' cup', !!c);
-    add('Espresso ' + (c ? c.shots : 0) + '/' + R.shots, c && c.shots === R.shots);
-    if (R.milk) add('Milk · hold V / L', c && c.milk >= 0.25);
-    if (R.water) add('Water · hold V / L', c && c.water >= 0.25);
-    if (R.syrup) add(SYRUPS[R.syrup].name + ' ' + (c ? c.pumps : 0) + '/2', c && c.pumps >= 2);
-    if (R.foam) add('Froth ' + (c ? c.frothN || 0 : 0) + '/4', c && c.foam);
-    if (R.ice) add('Add ice', c && c.ice);
+    add(R.kind === 'hot' ? 'H' : 'J', R.kind.toUpperCase() + ' CUP', !!c);
+    if (R.ice) add('I', 'ICE', c && c.ice);
+    add('E', 'ESPRESSO ' + (c ? c.shots : 0) + '/' + R.shots, c && c.shots === R.shots);
+    if (R.syrup) add(Object.keys(SYR).find(t => SYR[t] === R.syrup), SYRUPS[R.syrup].name + ' ' + (c ? c.pumps : 0) + '/2', c && c.pumps >= 2);
+    if (R.milk) add('M', 'MILK · hold V/L', c && c.milk >= 0.25);
+    if (R.water) add('W', 'WATER · hold V/L', c && c.water >= 0.25);
+    if (R.foam) add('F', 'FROTH ' + (c ? c.frothN || 0 : 0) + '/4', c && c.foam);
   }
   return steps;
 }
+
 function sharedOrders(){
   const available = players.map(p => p.hold).concat(cellsWhere(c => c.item).map(c => c.item)).filter(Boolean);
   const used = new Set();
@@ -887,9 +922,29 @@ function sharedOrders(){
   }); // waiting() is ordered by seconds of patience remaining, most urgent first.
 }
 
-function worldHintsVisible(){
-  return state === 'play' && !paused && showHints && ROUND - G.time < GUIDANCE_SECONDS;
+function worldHintsVisible(cu = null){
+  return state === 'play' && !paused && showHints && (ROUND - G.time < GUIDANCE_SECONDS || !!(cu && firstRecipe(cu.R)));
 }
+function recipeGuide(order){
+  const { cu, item } = order, owner = players.find(p => p.hold && p.hold === item);
+  const p = { x: owner ? owner.x : W / 2, y: owner ? owner.y : OY + TD * 2, hold: owner ? item : null, kn: { grab: mode === 1 ? 'C' : 'C/K', act: mode === 1 ? 'V' : 'V/L' }, col: C.purple, tag: 'RECIPE' };
+  return { p, cu, h: hintFor(p, cu), shared: true };
+}
+function sceneHints(){
+  const hints = playerHints();
+  // Co-op first-time tutorials belong to shared orders, never a named player.
+  if (mode === 2 && ROUND - G.time >= GUIDANCE_SECONDS){
+    return sharedOrders().filter(o => firstRecipe(o.cu.R)).map(recipeGuide);
+  }
+  return hints;
+}
+function recipeNextText(order){
+  const guide = recipeGuide(order), h = guide.h;
+  if (!h) return 'Follow the numbered steps';
+  const station = STATIONS[h.cell.type], action = h.key ? (h.hold ? 'HOLD ' : 'TAP ') + h.key : 'WAIT';
+  return (station ? station.id + ' ' + station.name : 'WINDOW ' + (order.cu.slot + 1)) + ' · ' + action;
+}
+
 function worldHintMarker(p, h){
   if (h.cell.type === 'O'){
     const cu = slots[Math.floor((h.cell.c - 2) / 3)];
@@ -1076,14 +1131,11 @@ function drawBubble(cu, time, ox = 0, oy = 0){
   txt(ctx, R.name, bx + 50, by + 13, { f: 't', size: 13, align: 'left' });
   txt(ctx, cu.name, bx + w - 8, by + 13, { f: 'h', size: 14, align: 'right', color: C.pinkD });
   let ix = bx + 52;
-  if (!R.food){
-    for (let i = 0; i < R.shots; i++){ circ(ctx, ix + 5, by + 32, 5); sf(ctx, C.coffee, 1.6); ix += 13; } ix += 4;
-    if (R.milk){ rr(ctx, ix, by + 26, 14, 12, 3); sf(ctx, '#fff', 1.6); ix += 19; }
-    if (R.water){ rr(ctx, ix, by + 26, 14, 12, 3); sf(ctx, C.blueL, 1.6); ix += 19; }
-    if (R.syrup){ rr(ctx, ix, by + 25, 10, 14, 3); sf(ctx, SYRUPS[R.syrup].col, 1.6); ix += 15; }
-    if (R.foam){ circ(ctx, ix + 6, by + 32, 6); sf(ctx, '#fff', 1.6); circ(ctx, ix + 12, by + 31, 5); sf(ctx, '#fff', 1.6); ix += 22; }
-    if (R.ice){ rr(ctx, ix, by + 26, 12, 12, 2); sf(ctx, C.blueL, 1.6); ix += 17; }
-  } else txt(ctx, 'from the oven', ix, by + 32, { size: 11, align: 'left', color: C.brown });
+  for (const step of orderSteps(R, null)){
+    rr(ctx, ix, by + 24, 20, 16, 3); sf(ctx, step.station.col, 1.4);
+    txt(ctx, step.station.id, ix + 10, by + 32, { f: 't', size: 10 }); ix += 23;
+  }
+
   const col = f > 0.5 ? C.greenL : f > 0.22 ? C.yellow : C.red;
   rr(ctx, bx + 50, by + 43, w - 64, 6, 3); fl(ctx, C.grey); rr(ctx, bx + 50, by + 43, Math.max(5, (w - 64) * f), 6, 3); fl(ctx, col);
   heart(ctx, bx + w - 9, by + 46, 5, col, 1.5);
@@ -1128,16 +1180,22 @@ function drawScene(time, pulse){
   });
   for (const p of players) drawPourGauge(p);
   for (const q of parts){ ctx.globalAlpha = clamp((1 - q.life / q.max) * 1.4, 0, 1); if (q.heart) heart(ctx, q.x, q.y, q.r, q.col, 1.5); else if (q.star) star(ctx, q.x, q.y, q.r * 1.6, q.col, 1.4, q.rot); else if (q.steam){ circ(ctx, q.x, q.y, q.r * (1 + q.life)); sf(ctx, q.col, 1.4); } else { circ(ctx, q.x, q.y, q.r); sf(ctx, q.col, 1.2); } ctx.globalAlpha = 1; }
-  const hints = state === 'play' ? playerHints() : [];
-  if (worldHintsVisible()) for (const { p, h } of hints){
-    if (!h) continue;
+  const hints = state === 'play' ? sceneHints() : [], marked = new Set(), labelPositions = [];
+  for (const { p, h, cu, shared } of hints){
+    if (!h || !worldHintsVisible(cu)) continue;
+    const markerKey = h.cell.r + ':' + h.cell.c + ':' + h.key;
+    if (marked.has(markerKey)) continue; marked.add(markerKey);
     const marker = worldHintMarker(p, h); if (!marker) continue;
     ctx.save(); ctx.translate(marker.x, marker.y); ctx.scale(marker.scale, marker.scale);
-    drawArrow(0, 0, p.col, time + (p.tag === '2P' ? 0.4 : 0)); ctx.restore();
-    const label = marker.customer ? (p.hold ? 'SERVE ' : 'READ ') + h.key : h.key ? (h.hold ? 'HOLD ' : 'TAP ') + h.key + (h.altKey && h.altKey !== h.key ? ' / ' + h.altKey : '') : 'WAIT';
-    const x = marker.labelX, y = marker.labelY;
-    rr(ctx, x - 46, y - 13, 92, 26, 6); sf(ctx, p.col, 2);
-    txt(ctx, label, x, y + 1, { f: 't', size: fitText(label, 80, 17, 11), color: '#fff' });
+    drawArrow(0, 0, shared && STATIONS[h.cell.type] ? STATIONS[h.cell.type].col : p.col, time + (p.tag === '2P' ? 0.4 : 0)); ctx.restore();
+    const station = STATIONS[h.cell.type];
+    const actionLabel = marker.customer ? (p.hold ? 'SERVE ' : 'READ ') + h.key : h.key ? (h.hold ? 'HOLD ' : 'TAP ') + h.key + (h.altKey && h.altKey !== h.key ? ' / ' + h.altKey : '') : 'WAIT';
+    const label = station ? station.id + ' · ' + actionLabel : actionLabel;
+    const x = marker.labelX; let y = marker.labelY;
+    while (labelPositions.some(pos => Math.abs(pos.x - x) < 98 && Math.abs(pos.y - y) < 30)) y -= 30;
+    labelPositions.push({ x, y });
+    rr(ctx, x - 46, y - 13, 92, 26, 6); sf(ctx, station ? station.col : p.col, 2);
+    txt(ctx, label, x, y + 1, { f: 't', size: fitText(label, 80, 17, 9), color: station ? INK : '#fff' });
   }
   drawHUD(time, pulse, hints);
   for (const q of pops){ const k = q.life / q.max, sc = q.life < 0.15 ? easeOutBack(q.life / 0.15) : 1; ctx.save(); ctx.globalAlpha = clamp((1 - k) * 2, 0, 1); ctx.translate(q.x, q.y); ctx.scale(sc, sc); txt(ctx, q.s, 0, 0, { f: q.title ? 't' : 'b', size: q.size, color: q.col, stroke: q.stroke, lw: 6 }); ctx.restore(); }
@@ -1150,22 +1208,27 @@ function itemLabel(it){
 function fitText(s, maxWidth, size = 14, min = 10){ while (size > min && measure(s, size, 't') > maxWidth) size--; return size; }
 function drawSharedOrders(){
   rr(ctx, 12, 486, W - 24, 156, 8); sf(ctx, C.tealD, 2.4);
-  txt(ctx, 'SHARED ORDERS · least time left first · choose any order', 26, 500, { f: 't', size: 15, color: '#fff', align: 'left' });
+  txt(ctx, 'SHARED ORDERS · urgent first · numbers + colors match the machines', 26, 500, { f: 't', size: 15, color: '#fff', align: 'left' });
   const orders = sharedOrders();
   if (!orders.length){ txt(ctx, 'Waiting for customers…  Take a cup or pastry to get ready.', W / 2, 567, { f: 't', size: 20, color: C.paper }); return; }
-  for (const [rank, { cu, item, steps, ready }] of orders.entries()){
+  for (const [rank, order] of orders.entries()){
+    const { cu, item, steps, ready } = order;
     const x = 20 + rank * 312, y = 514, w = 304;
     rr(ctx, x, y, w, 120, 6); sf(ctx, ready ? C.mint : C.paper, 2);
     txt(ctx, 'WINDOW ' + (cu.slot + 1) + ' · ' + cu.name, x + 10, y + 13, { f: 't', size: 12, color: C.pinkD, align: 'left' });
-    txt(ctx, cu.R.name, x + 10, y + 33, { f: 't', size: 19, align: 'left' });
+    txt(ctx, cu.R.name, x + 10, y + 33, { f: 't', size: fitText(cu.R.name, w - 70, 19, 14), align: 'left' });
+    if (firstRecipe(cu.R)){ rr(ctx, x + w - 55, y + 24, 45, 18, 4); sf(ctx, C.lavL, 1.5); txt(ctx, 'NEW', x + w - 32.5, y + 33, { f: 't', size: 11, color: C.purple }); }
     const f = cu.pat / cu.max; bar(x + w - 74, y + 8, 62, f, f < 0.25 ? C.red : C.greenL);
     txt(ctx, Math.ceil(cu.pat) + 's', x + w - 82, y + 13, { f: 't', size: 12, color: cu.pat <= 20 ? C.red : C.brown, align: 'right' });
     steps.forEach((step, i) => {
       const xx = x + 10 + (i % 2) * 147, yy = y + 54 + Math.floor(i / 2) * 17;
-      txt(ctx, (step.done ? '✓ ' : '○ ') + step.label, xx, yy, { size: fitText(step.label, 130, 11, 9), color: step.done ? C.greenD : INK, align: 'left' });
+      rr(ctx, xx, yy - 7, 140, 15, 3); sf(ctx, step.station.col, 1);
+      txt(ctx, step.station.id, xx + 9, yy + 0.5, { f: 't', size: 10 });
+      txt(ctx, step.label, xx + 21, yy + 0.5, { size: fitText(step.label, 103, 10, 8), color: INK, align: 'left' });
+      if (step.done) txt(ctx, '✓', xx + 132, yy + 0.5, { f: 't', size: 11, color: C.greenD });
     });
-    const status = ready ? 'READY → window ' + (cu.slot + 1) + ' · C / K to serve' : item ? 'IN PROGRESS · either barista can continue' : 'START ANYTIME · no assigned barista';
-    txt(ctx, status, x + 10, y + 108, { f: 't', size: fitText(status, w - 20, 12), color: ready ? C.greenD : C.brown, align: 'left' });
+    const status = ready ? 'READY → window ' + (cu.slot + 1) + ' · C / K to serve' : firstRecipe(cu.R) ? 'FIRST TRY → ' + recipeNextText(order) : item ? 'IN PROGRESS · either barista can continue' : 'START ANYTIME · choose any order';
+    txt(ctx, status, x + 10, y + 108, { f: 't', size: fitText(status, w - 20, 12), color: ready ? C.greenD : firstRecipe(cu.R) ? C.purple : C.brown, align: 'left' });
   }
 }
 function drawPlayerPanel(x, w, p){
@@ -1174,7 +1237,7 @@ function drawPlayerPanel(x, w, p){
   rr(ctx, x + 5, 655, 38, 48, 5); sf(ctx, p.col, 2); txt(ctx, p.tag, x + 24, 680, { f: 't', size: 16, color: '#fff' });
   const move = p.tag === '2P' ? 'ARROWS' : 'WASD';
   txt(ctx, move + ' move · ' + p.kn.grab + ' take / put / serve · ' + p.kn.act + ' machine', x + 54, 664, { f: 't', size: 13, align: 'left', color: C.brown });
-  const label = hint ? (hint.key ? (hint.hold ? 'HOLD ' : 'TAP ') + hint.key + ' · ' : '') + hint.text : 'Face a counter to interact';
+  const label = hint ? (hint.key ? (hint.hold ? 'HOLD ' : 'TAP ') + hint.key + ' · ' : '') + (STATIONS[hint.cell.type] ? '[' + STATIONS[hint.cell.type].id + ' ' + STATIONS[hint.cell.type].name + '] ' : '') + hint.text : 'Face a counter to interact';
   txt(ctx, label, x + 54, 685, { f: 't', size: fitText(label, w - 68, 17, 11), align: 'left' });
   txt(ctx, itemLabel(p.hold), x + w - 10, 700, { size: 10, align: 'right', color: C.pinkD });
 
@@ -1208,7 +1271,7 @@ function drawHUD(time, pulse, hints){
   drawSharedOrders();
   if (players.length === 1) drawPlayerPanel(16, W - 32, players[0]);
   else players.forEach((p, i) => drawPlayerPanel(16 + i * (W / 2 - 8), W / 2 - 24, p));
-  txt(ctx, (ROUND - G.time < GUIDANCE_SECONDS ? 'First-minute arrows (H)' : 'Guidance below') + ' · Esc pause · M mute', W / 2, 716, { size: 10, color: '#fff' });
+  txt(ctx, (ROUND - G.time < GUIDANCE_SECONDS ? 'First-minute arrows (H)' : 'New recipes keep arrows (H)') + ' · Esc pause · M mute', W / 2, 716, { size: 10, color: '#fff' });
   const ban = (text, sub, k, col) => { const cxp = k > 2.0 ? lerp(W + 400, W / 2, (2.5 - k) / 0.5) : k < 0.5 ? lerp(-400, W / 2, k / 0.5) : W / 2; ctx.save(); ctx.translate(cxp, 440); ctx.rotate(-0.04); rr(ctx, -300, -50, 600, 100, 8); sf(ctx, col, 3); stripes(ctx, -300, -50, 600, 10, C.paper, 14, 4, true); txt(ctx, text, 0, -2, { f: 't', size: 42, color: C.yellow, stroke: INK, lw: 6 }); if (sub) txt(ctx, sub, 0, 32, { f: 'h', size: 22, color: '#fff' }); ctx.restore(); };
   if (G.banner) ban(G.banner.text, G.banner.sub, Math.min(2.5, G.banner.t), G.banner.text === 'GOLDEN HOUR' ? C.orange : C.purple);
   if (G.rushBanner > 0) ban('LAST CALL! 30s LEFT', null, G.rushBanner, C.red);
@@ -1281,9 +1344,9 @@ function drawBrief(time, pulse){
   txt(ctx, 'READ THE ORDER', 255, 456, { f: 't', size: 20, color: C.pinkD });
   const demo = { name: 'Rosa', R: MENU.cappuccino, pat: 60, max: 90, x: 140, state: 'wait' };
   drawBubble(demo, time, 0, 432 - (CUST_Y - 178) + 40);
-  const notes = [['● brown dots', 'espresso shots'], ['□ white / blue', 'milk / hot water'], ['▮ colored bottle', '2 pumps of syrup'], ['○○ clouds', 'froth the milk'], ['heart bar', 'their patience']];
+  const notes = [['03 ESPRESSO', 'same number on the machine'], ['05 MILK / 04 WATER', 'same color on its counter'], ['08 / 09 / 10', 'vanilla / caramel / choco'], ['✓ on a step', 'that step is complete'], ['NEW / FIRST TRY', 'help until first successful serve']];
   notes.forEach((n, i) => { txt(ctx, n[0], 250, 482 + i * 28, { f: 't', size: 14, align: 'left' }); txt(ctx, n[1], 250, 496 + i * 28, { size: 11, color: C.brown, align: 'left' }); });
-  drawArrow(56, 664, C.red, time); txt(ctx, 'Arrows + keys for the first 60 seconds', 84, 646, { f: 't', size: 15, align: 'left' }); txt(ctx, 'Then follow the guidance at the bottom', 84, 666, { f: 't', size: 15, align: 'left' });
+  drawArrow(56, 664, C.red, time); txt(ctx, 'New recipes keep arrows until served', 84, 646, { f: 't', size: 15, align: 'left' }); txt(ctx, 'Known recipes: bottom help after 60s', 84, 666, { f: 't', size: 15, align: 'left' });
   txt(ctx, 'Sunset halfway · last call = final 30 seconds', 84, 688, { size: 12, align: 'left', color: C.pinkD });
   tile(502, 432, 450, 168, C.pinkL);
   txt(ctx, 'CONTROLS', 727, 456, { f: 't', size: 20 });
