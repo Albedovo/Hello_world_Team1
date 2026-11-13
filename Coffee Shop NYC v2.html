@@ -1325,14 +1325,14 @@ function drawBrief(time, pulse){
   txt(ctx, 'BARISTA TRAINING · V2', 210, 47, { f: 't', size: 32 });
   txt(ctx, `${LENGTHS[lengthKey].name} (${LENGTHS[lengthKey].sub}) · ${mode === 2 ? '2 baristas' : '1 barista'}`, 820, 47, { f: 't', size: 16 });
   const steps = [
-    ['1 CUP', 'HOT or ICED cup', C.pink, g => drawCup(g, newCup('hot'), 0, 30, 1.1)],
-    ['2 ESPRESSO', 'Cup in machine,', 'tap on the beat', C.yellowL, g => { rr(g, -26, -30, 52, 34, 6); sf(g, C.red, 2.2); line(g, 0, 4, 0, 20, 3, C.coffee); drawCup(g, Object.assign(newCup('hot'), { shots: 1, fill: 0.2 }), 0, 46, 0.7); }],
-    ['3 MILK / WATER', 'HOLD to pour,', 'stop at the line', C.blueL, g => drawCup(g, Object.assign(newCup('iced'), { shots: 1, milk: 0.6, fill: 0.8 }), 0, 30, 1.1)],
-    ['4 SYRUP', 'Tap 2 pumps', 'on the beat', C.yellow, g => { rr(g, -14, -24, 28, 46, 8); sf(g, C.caramel, 2.2); rr(g, -4, -36, 8, 14, 2); sf(g, C.greyD, 2); }],
-    ['5 FROTH', 'Milk in? Tap 4x', 'on the beat', C.lavL, g => drawCup(g, Object.assign(newCup('hot'), { shots: 1, milk: 0.6, foam: true, fill: 0.8 }), 0, 30, 1.1)],
-    ['6 ICE', 'Iced drinks only', C.tealL, g => drawCup(g, Object.assign(newCup('iced'), { ice: 1, fill: 0.1 }), 0, 30, 1.1)],
-    ['7 PASTRY', 'Bagel/croissant', '→ oven → serve', C.cream, g => { drawFood(g, 'bagel', 'done', -14, 18, 0.8); drawFood(g, 'croissant', 'done', 16, 8, 0.7); }],
-    ['8 SERVE', 'Hand it over at', 'the window!', C.greenL, g => { g.save(); g.translate(0, 66); g.scale(0.6, 0.6); drawPersonFront(g, titleLooks ? titleLooks[0] : randLook(), 2, time, true); g.restore(); }],
+    ['01 / 02 CUP', 'HOT or ICED cup', STATIONS.H.col, g => drawCup(g, newCup('hot'), 0, 30, 1.1)],
+    ['03 ESPRESSO', 'Cup in machine,', 'tap on the beat', STATIONS.E.col, g => { rr(g, -26, -30, 52, 34, 6); sf(g, C.red, 2.2); line(g, 0, 4, 0, 20, 3, C.coffee); drawCup(g, Object.assign(newCup('hot'), { shots: 1, fill: 0.2 }), 0, 46, 0.7); }],
+    ['04 / 05 POUR', 'HOLD water / milk,', 'stop at the line', STATIONS.W.col, g => drawCup(g, Object.assign(newCup('iced'), { shots: 1, milk: 0.6, fill: 0.8 }), 0, 30, 1.1)],
+    ['08–10 SYRUP', 'Tap 2 pumps', 'on the beat', STATIONS.A.col, g => { rr(g, -14, -24, 28, 46, 8); sf(g, C.caramel, 2.2); rr(g, -4, -36, 8, 14, 2); sf(g, C.greyD, 2); }],
+    ['06 FROTH', 'Milk in? Tap 4x', 'on the beat', STATIONS.F.col, g => drawCup(g, Object.assign(newCup('hot'), { shots: 1, milk: 0.6, foam: true, fill: 0.8 }), 0, 30, 1.1)],
+    ['07 ICE', 'Iced drinks only', STATIONS.I.col, g => drawCup(g, Object.assign(newCup('iced'), { ice: 1, fill: 0.1 }), 0, 30, 1.1)],
+    ['11–13 PASTRY', 'Bagel/croissant', '→ 12 OVEN → serve', STATIONS.Q.col, g => { drawFood(g, 'bagel', 'done', -14, 18, 0.8); drawFood(g, 'croissant', 'done', 16, 8, 0.7); }],
+    ['SERVE', 'Hand it over at', 'the window!', C.greenL, g => { g.save(); g.translate(0, 66); g.scale(0.6, 0.6); drawPersonFront(g, titleLooks ? titleLooks[0] : randLook(), 2, time, true); g.restore(); }],
   ];
   steps.forEach((s, i) => {
     const x = 20 + (i % 4) * 312, y = 90 + Math.floor(i / 4) * 170;
