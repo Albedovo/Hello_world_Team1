@@ -301,6 +301,7 @@ const POOLS = {
 const LENGTHS = { full: { name: 'FULL DAY', sub: '5 min afternoon + 5 min night', t: 600 }, quick: { name: 'QUICK SHIFT', sub: '4 minutes, sunset in the middle', t: 240 } };
 let lengthKey = 'full';
 let ROUND = LENGTHS.full.t;
+const GUIDANCE_SECONDS = 60;
 const RUSH_AT = 30, BREW_T = 3.2, BREW_FAST = 2.0, BAKE_T = 6, BURN_T = 30, FROTH_N = 4, PUMP_N = 2;
 
 // ================== audio ==================
@@ -615,7 +616,8 @@ function spawnCustomer(){
   if (!free.length || custs.filter(c => c.state === 'wait' || c.state === 'enter').length >= limit) return false;
   const slot = pick(free), R = genOrder();
   const cx = R.food ? 0 : (R.shots - 1) * 8 + (R.milk ? 6 : 0) + (R.water ? 4 : 0) + (R.syrup ? 10 : 0) + (R.foam ? 10 : 0) + (R.ice ? 6 : 0);
-  const max = (mode === 1 ? 105 : 85) + cx + (G.spawned < 3 ? 30 : 0);
+  // Each customer has their own patience; complex orders keep extra time.
+  const max = rint(mode === 1 ? 75 : 60, mode === 1 ? 135 : 110) + cx + (G.spawned < 3 ? 30 : 0);
   const cu = { slot, L: randLook(), name: pick(NAMES), R, pat: max, max, x: Math.random() < 0.5 ? WIN.x - 60 : WIN.x + WIN.w + 60, state: 'enter', t: 0, got: null };
   custs.push(cu); slots[slot] = cu; G.spawned++; AU.bell(); return true;
 }
@@ -847,12 +849,12 @@ function stationHint(p){
 function playerHints(){
   return players.map(p => {
     const local = stationHint(p);
-    // Solo keeps optional next-step guidance. Co-op has only shared orders
+    // Bottom guidance stays available throughout the shift. Co-op has shared orders
     // and local controls, so neither player is assigned a customer or role.
-    if (mode === 2) return { p, cu: null, h: showHints ? local : null };
+    if (mode === 2) return { p, cu: null, h: local };
     const cu = pickTarget(p, 0), next = hintFor(p, cu);
     const h = local && (!next || local.cell === next.cell) ? Object.assign({}, local, next && next.key ? { key: next.key, text: next.text, hold: next.hold } : {}) : next || local;
-    return { p, cu, h: showHints ? h : null };
+    return { p, cu, h };
   });
 }
 // An item counts toward at most one order, independent of who holds it.
@@ -882,7 +884,22 @@ function sharedOrders(){
     candidates.sort((a, b) => progress(b) - progress(a));
     const item = candidates[0] || null; if (item) used.add(item);
     return { cu, item, steps: orderSteps(cu.R, item), ready: item && complete(item, cu.R) };
-  }).sort((a, b) => a.cu.slot - b.cu.slot);
+  }); // waiting() is ordered by seconds of patience remaining, most urgent first.
+}
+
+function worldHintsVisible(){
+  return state === 'play' && !paused && showHints && ROUND - G.time < GUIDANCE_SECONDS;
+}
+function worldHintMarker(p, h){
+  if (h.cell.type === 'O'){
+    const cu = slots[Math.floor((h.cell.c - 2) / 3)];
+    if (!cu || (cu.state !== 'wait' && cu.state !== 'enter')) return null;
+    // Point above the actual customer's head, with the key beside their face.
+    // This follows entering customers instead of pointing at the counter/floor.
+    return { x: cu.x, y: CUST_Y - 114, scale: 0.65, labelX: clamp(cu.x + 94, 56, W - 56), labelY: CUST_Y - 82, customer: true };
+  }
+  const a = anchor(h.cell), y = h.cell.r === 0 ? cellTop(h.cell) + 64 : cellTop(h.cell) - 45;
+  return { x: a.x, y, scale: 1, labelX: clamp(a.x, 60, W - 60), labelY: y - 42, customer: false };
 }
 
 // ---------- effects ----------
@@ -1112,12 +1129,13 @@ function drawScene(time, pulse){
   for (const p of players) drawPourGauge(p);
   for (const q of parts){ ctx.globalAlpha = clamp((1 - q.life / q.max) * 1.4, 0, 1); if (q.heart) heart(ctx, q.x, q.y, q.r, q.col, 1.5); else if (q.star) star(ctx, q.x, q.y, q.r * 1.6, q.col, 1.4, q.rot); else if (q.steam){ circ(ctx, q.x, q.y, q.r * (1 + q.life)); sf(ctx, q.col, 1.4); } else { circ(ctx, q.x, q.y, q.r); sf(ctx, q.col, 1.2); } ctx.globalAlpha = 1; }
   const hints = state === 'play' ? playerHints() : [];
-  if (state === 'play' && !paused) for (const { p, h } of hints){
+  if (worldHintsVisible()) for (const { p, h } of hints){
     if (!h) continue;
-    const a = anchor(h.cell), ay = h.cell.r === 0 ? cellTop(h.cell) + 64 : cellTop(h.cell) - 45;
-    drawArrow(a.x, ay, p.col, time + (p.tag === '2P' ? 0.4 : 0));
-    const label = h.key ? (h.hold ? 'HOLD ' : 'TAP ') + h.key + (h.altKey && h.altKey !== h.key ? ' / ' + h.altKey : '') : 'WAIT';
-    const x = clamp(a.x, 60, W - 60), y = ay - 42;
+    const marker = worldHintMarker(p, h); if (!marker) continue;
+    ctx.save(); ctx.translate(marker.x, marker.y); ctx.scale(marker.scale, marker.scale);
+    drawArrow(0, 0, p.col, time + (p.tag === '2P' ? 0.4 : 0)); ctx.restore();
+    const label = marker.customer ? (p.hold ? 'SERVE ' : 'READ ') + h.key : h.key ? (h.hold ? 'HOLD ' : 'TAP ') + h.key + (h.altKey && h.altKey !== h.key ? ' / ' + h.altKey : '') : 'WAIT';
+    const x = marker.labelX, y = marker.labelY;
     rr(ctx, x - 46, y - 13, 92, 26, 6); sf(ctx, p.col, 2);
     txt(ctx, label, x, y + 1, { f: 't', size: fitText(label, 80, 17, 11), color: '#fff' });
   }
@@ -1132,15 +1150,16 @@ function itemLabel(it){
 function fitText(s, maxWidth, size = 14, min = 10){ while (size > min && measure(s, size, 't') > maxWidth) size--; return size; }
 function drawSharedOrders(){
   rr(ctx, 12, 486, W - 24, 156, 8); sf(ctx, C.tealD, 2.4);
-  txt(ctx, 'SHARED ORDERS · choose any order, swap work anytime', 26, 500, { f: 't', size: 15, color: '#fff', align: 'left' });
+  txt(ctx, 'SHARED ORDERS · least time left first · choose any order', 26, 500, { f: 't', size: 15, color: '#fff', align: 'left' });
   const orders = sharedOrders();
   if (!orders.length){ txt(ctx, 'Waiting for customers…  Take a cup or pastry to get ready.', W / 2, 567, { f: 't', size: 20, color: C.paper }); return; }
-  for (const { cu, item, steps, ready } of orders){
-    const x = 20 + cu.slot * 312, y = 514, w = 304;
+  for (const [rank, { cu, item, steps, ready }] of orders.entries()){
+    const x = 20 + rank * 312, y = 514, w = 304;
     rr(ctx, x, y, w, 120, 6); sf(ctx, ready ? C.mint : C.paper, 2);
     txt(ctx, 'WINDOW ' + (cu.slot + 1) + ' · ' + cu.name, x + 10, y + 13, { f: 't', size: 12, color: C.pinkD, align: 'left' });
     txt(ctx, cu.R.name, x + 10, y + 33, { f: 't', size: 19, align: 'left' });
     const f = cu.pat / cu.max; bar(x + w - 74, y + 8, 62, f, f < 0.25 ? C.red : C.greenL);
+    txt(ctx, Math.ceil(cu.pat) + 's', x + w - 82, y + 13, { f: 't', size: 12, color: cu.pat <= 20 ? C.red : C.brown, align: 'right' });
     steps.forEach((step, i) => {
       const xx = x + 10 + (i % 2) * 147, yy = y + 54 + Math.floor(i / 2) * 17;
       txt(ctx, (step.done ? '✓ ' : '○ ') + step.label, xx, yy, { size: fitText(step.label, 130, 11, 9), color: step.done ? C.greenD : INK, align: 'left' });
@@ -1150,7 +1169,7 @@ function drawSharedOrders(){
   }
 }
 function drawPlayerPanel(x, w, p){
-  const local = stationHint(p), hint = mode === 1 && showHints ? playerHints()[0].h : local;
+  const local = stationHint(p), hint = mode === 1 ? playerHints()[0].h : local;
   rr(ctx, x, 650, w, 58, 6); sf(ctx, C.paper, 2.2);
   rr(ctx, x + 5, 655, 38, 48, 5); sf(ctx, p.col, 2); txt(ctx, p.tag, x + 24, 680, { f: 't', size: 16, color: '#fff' });
   const move = p.tag === '2P' ? 'ARROWS' : 'WASD';
@@ -1189,7 +1208,7 @@ function drawHUD(time, pulse, hints){
   drawSharedOrders();
   if (players.length === 1) drawPlayerPanel(16, W - 32, players[0]);
   else players.forEach((p, i) => drawPlayerPanel(16 + i * (W / 2 - 8), W / 2 - 24, p));
-  txt(ctx, 'H guidance · Esc pause · M mute', W / 2, 716, { size: 10, color: '#fff' });
+  txt(ctx, (ROUND - G.time < GUIDANCE_SECONDS ? 'First-minute arrows (H)' : 'Guidance below') + ' · Esc pause · M mute', W / 2, 716, { size: 10, color: '#fff' });
   const ban = (text, sub, k, col) => { const cxp = k > 2.0 ? lerp(W + 400, W / 2, (2.5 - k) / 0.5) : k < 0.5 ? lerp(-400, W / 2, k / 0.5) : W / 2; ctx.save(); ctx.translate(cxp, 440); ctx.rotate(-0.04); rr(ctx, -300, -50, 600, 100, 8); sf(ctx, col, 3); stripes(ctx, -300, -50, 600, 10, C.paper, 14, 4, true); txt(ctx, text, 0, -2, { f: 't', size: 42, color: C.yellow, stroke: INK, lw: 6 }); if (sub) txt(ctx, sub, 0, 32, { f: 'h', size: 22, color: '#fff' }); ctx.restore(); };
   if (G.banner) ban(G.banner.text, G.banner.sub, Math.min(2.5, G.banner.t), G.banner.text === 'GOLDEN HOUR' ? C.orange : C.purple);
   if (G.rushBanner > 0) ban('LAST CALL! 30s LEFT', null, G.rushBanner, C.red);
@@ -1264,7 +1283,7 @@ function drawBrief(time, pulse){
   drawBubble(demo, time, 0, 432 - (CUST_Y - 178) + 40);
   const notes = [['● brown dots', 'espresso shots'], ['□ white / blue', 'milk / hot water'], ['▮ colored bottle', '2 pumps of syrup'], ['○○ clouds', 'froth the milk'], ['heart bar', 'their patience']];
   notes.forEach((n, i) => { txt(ctx, n[0], 250, 482 + i * 28, { f: 't', size: 14, align: 'left' }); txt(ctx, n[1], 250, 496 + i * 28, { size: 11, color: C.brown, align: 'left' }); });
-  drawArrow(56, 664, C.red, time); txt(ctx, 'Follow the arrow + its TAP / HOLD key', 84, 646, { f: 't', size: 15, align: 'left' }); txt(ctx, '+ check every drink on the shared board', 84, 666, { f: 't', size: 15, align: 'left' });
+  drawArrow(56, 664, C.red, time); txt(ctx, 'Arrows + keys for the first 60 seconds', 84, 646, { f: 't', size: 15, align: 'left' }); txt(ctx, 'Then follow the guidance at the bottom', 84, 666, { f: 't', size: 15, align: 'left' });
   txt(ctx, 'Sunset halfway · last call = final 30 seconds', 84, 688, { size: 12, align: 'left', color: C.pinkD });
   tile(502, 432, 450, 168, C.pinkL);
   txt(ctx, 'CONTROLS', 727, 456, { f: 't', size: 20 });

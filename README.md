@@ -11,8 +11,9 @@ A comic-style rhythm café game for one or two players on one keyboard.
 
 - Two parallel counters and two open walking lanes; no central island.
 - Bagels and croissants sit next to the ovens.
-- Arrows show **TAP / HOLD + the actual key**; the control bar explains the nearby station.
-- A shared order board shows drink names, remaining steps, ingredient counts, and ready-to-serve orders.
+- Arrows show **TAP / HOLD + the actual key** during the first 60 seconds of each shift. Delivery arrows point above customers; bottom guidance remains available for the whole game.
+- A shared order board shows drink names, remaining steps, ingredient counts, and ready-to-serve orders. Cards sort by seconds of patience remaining, most urgent first, and retain their window numbers.
+- Each customer has random patience, with extra time for complex orders and the opening customers.
 - Co-op has no assigned roles or customers. Either barista can start or continue any item.
 
 | Player | Move | Take / put / serve | Use machine / pour |
@@ -20,7 +21,7 @@ A comic-style rhythm café game for one or two players on one keyboard.
 | 1P | WASD | C (or Space) | V |
 | 2P | Arrow keys | K (or Enter) | L |
 
-Tap the machine key to brew, pump syrup, froth, or add ice. Hold it to pour milk/water; release in the green zone. At the espresso machine, put a cup down, tap to brew, then pick it up. Pastries bake automatically in the oven. Esc pauses, M mutes, and H toggles optional guidance. Solo also accepts the second player's controls.
+Tap the machine key to brew, pump syrup, froth, or add ice. Hold it to pour milk/water; release in the green zone. At the espresso machine, put a cup down, tap to brew, then pick it up. Pastries bake automatically in the oven. Esc pauses, M mutes, and H toggles arrows within the first minute; bottom guidance stays visible. Solo also accepts the second player's controls.
 
 Open either game HTML directly in a desktop browser; no install or build step is needed. Google Fonts loads when online; local fallback fonts work offline.
 
