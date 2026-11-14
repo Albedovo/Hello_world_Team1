@@ -2,7 +2,7 @@
 
 A comic-style rhythm café game for one or two players on one keyboard.
 
-**[Play the latest version](https://albedovo.github.io/Hello_world_Team1/)**
+**[Play the latest version (V3)](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC3.html)**
 
 - [V3 — V2 + skippable tutorial, 8 / 3 minute shifts](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC3.html)
 - [V2 — two counters and shared orders](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC%20v2.html)
@@ -65,7 +65,7 @@ Open either game HTML directly in a desktop browser; no install or build step is
 - `Coffee Shop NYC.html`: V1, preserved original game.
 - `Coffee Shop NYC v2.html`: V2.
 - `Coffee Shop NYC3.html`: V3, V2 + skippable tutorial and 8 / 3 minute shifts.
-- `index.html`: root entry that opens V2 with a relative URL, including under the GitHub Pages repository path.
+- `index.html`: root entry that opens V3 with a relative URL, including under the GitHub Pages repository path.
 - `references/`: the four original PNG reference images, unchanged.
 - `.nojekyll`: serves this buildless static project directly.
 
