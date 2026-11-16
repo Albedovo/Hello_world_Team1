@@ -4,6 +4,7 @@ A comic-style rhythm café game for one or two players on one keyboard.
 
 **[Play the latest version (V3)](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC3.html)**
 
+- [V4 — bigger U-shaped kitchen, prompt cards, pickup order bar](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC%20v4.html)
 - [V3 — V2 + skippable tutorial, 8 / 3 minute shifts](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC3.html)
 - [V2 — two counters and shared orders](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC%20v2.html)
 - [V1 — original version (unchanged)](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC.html)
@@ -15,6 +16,21 @@ A comic-style rhythm café game for one or two players on one keyboard.
 | V1 | `Coffee Shop NYC.html` | 10 min full day / 4 min quick | First playable build: kitchen with a central island, NYC street through the window, afternoon → night |
 | V2 | `Coffee Shop NYC v2.html` | 10 min full day / 4 min quick | Two parallel counters, shared order board, numbered and color-coded stations |
 | V3 | `Coffee Shop NYC3.html` | **8 min** full day / **3 min** quick | Everything in V2, plus an interactive tutorial that players can skip |
+| V4 | `Coffee Shop NYC v4.html` | 8 min full day / 3 min quick | V3 with a larger U-shaped kitchen, context prompt cards and an order bar aligned to the pickups |
+
+Every version is kept as its own file; older files are never edited.
+
+## V4
+
+V4 keeps V3's recipes, rhythm mechanics, shift lengths, tutorial and controls, and reworks the layout and on-screen help so the controls are bigger and easier to read.
+
+- **Bigger kitchen.** Stations wrap around the floor in a U: cups and ice on the left, coffee / milk / froth / syrups along the back, ovens and bagels on the right, and the four pickups, trash and croissants on the front counter. The kitchen is drawn 1.3× larger than V3. The four corners are decoration only, so every station faces a floor tile.
+- **Pickups.** Each customer stands at one numbered PICKUP spot on the front counter.
+- **Prompt card.** Facing a station shows the key and what it does, e.g. `C PUT CUP IN`, `V BREW SHOT`, `HOLD · POUR MILK`. While learning (tutorial, first minute of a shift, recipes never served) the card also shows the station, progress and "♪ tap on the beat"; after that it shrinks to key + verb. Cards sit beside the barista, avoid the other barista and each other, and never cover the pour gauge.
+- **Order bar.** Cards keep pickup order. The order matching what someone is holding (or the most urgent one) opens to show its steps with checkmarks; the rest collapse to drink · seconds left · pickup.
+- **Quieter background.** The street is softened and passers-by are faded so customers stand out. Customer bubbles show only the drink and a patience ring.
+- **Hands bar.** The bottom line shows what 1P / 2P are holding and their keys. Arrows no longer carry text and disappear once you face the target.
+- Design mockups from the V4 redesign are in `design/v4-mockups/`.
 
 ## V3
 
@@ -65,6 +81,8 @@ Open either game HTML directly in a desktop browser; no install or build step is
 - `Coffee Shop NYC.html`: V1, preserved original game.
 - `Coffee Shop NYC v2.html`: V2.
 - `Coffee Shop NYC3.html`: V3, V2 + skippable tutorial and 8 / 3 minute shifts.
+- `Coffee Shop NYC v4.html`: V4, bigger U-shaped kitchen with prompt cards and a pickup-aligned order bar.
+- `design/v4-mockups/`: before/after comparison and layout mockups made for V4.
 - `index.html`: root entry that opens V3 with a relative URL, including under the GitHub Pages repository path.
 - `references/`: the four original PNG reference images, unchanged.
 - `.nojekyll`: serves this buildless static project directly.
