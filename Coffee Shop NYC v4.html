@@ -293,6 +293,8 @@ const cellX = cell => OX + cell.c * TW, cellTop = cell => OY + cell.r * TD - HB;
 const anchor = cell => ({ x: OX + cell.c * TW + TW / 2, y: OY + cell.r * TD - HB + TD / 2 + 4 });
 const slotX = i => OX + (1 + 2 * i) * TW + TW / 2;
 const slotOf = cell => (cell.c - 1) / 2;
+// Visible height of a counter box: its front face is hidden when another counter sits below it.
+const visH = cell => { const b = cellAt(cell.c, cell.r + 1); return b && b.type !== '.' ? TD : TD + HB; };
 const CUST_Y = OY - HB + 10;
 // WIN is the street's own paint space; WINV is where the street window sits in the world.
 const WIN = { x: 190, y: 28, w: 900, h: 178 };
@@ -1238,7 +1240,7 @@ function drawScene(time, pulse){
   }
   // the station each barista is facing: solid outline in their color
   const targets = players.map(p => targetCell(p));
-  players.forEach((p, i) => { const cell = targets[i]; if (!cell) return; ctx.save(); rr(ctx, cellX(cell) + 2, cellTop(cell) + 1, TW - 4, TD + HB - 2, 6); ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 3.5; ctx.strokeStyle = p.col; ctx.stroke(); ctx.restore(); });
+  players.forEach((p, i) => { const cell = targets[i]; if (!cell) return; ctx.save(); rr(ctx, cellX(cell) + 2, cellTop(cell) + 1, TW - 4, visH(cell) - 2, 6); ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 3.5; ctx.strokeStyle = p.col; ctx.stroke(); ctx.restore(); });
   for (const cu of custs) if (cu.state === 'wait' || cu.state === 'enter') drawBubble(cu, time);
   players.forEach((p, i) => {
     const cell = targets[i]; if (!cell) return; const h = p.hold;
@@ -1315,31 +1317,48 @@ function drawPrompts(time){
     const pr = promptFor(p); if (!pr || (!pr.acts.length && !pr.note)) continue;
     // Big card while learning (first minute, tutorial, or a never-served recipe); small chip after that.
     const learning = showHints && (state === 'tutorial' || ROUND - G.time < GUIDANCE_SECONDS || (!!p.hold && waiting().some(c => fits(p.hold, c.R) && firstRecipe(c.R))));
-    const big = learning && pr.acts.length > 0, ks = big ? 30 : 24, vs = big ? 19 : 15, pad = big ? 10 : 7;
-    const subT = big ? [pr.sub, pr.acts.some(a => RHYTHM[a.verb]) ? '♪ tap on the beat' : null].filter(Boolean).join('  ·  ') : '';
-    let rowW = 0; for (const a of pr.acts) rowW += ks + 6 + measure(a.label, vs, 't') + 14; rowW = pr.acts.length ? rowW - 14 : measure(pr.note, 13, 'b');
-    const w = Math.max(rowW, subT ? measure(subT, 13, 'b') : 0) + pad * 2, h = pr.acts.length ? ks + pad * 2 + (subT ? 20 : 0) : 26;
     const cell = pr.cell, a = anchor(cell);
+    // Side-column stations get their card on the wall right next to them (short tail, nothing covered).
+    const wall = (cell.c === 0 || cell.c === COLS - 1) && cell.r > 0 && cell.r < ROWS - 1;
+    const wx0 = cell.c === 0 ? 6 : (OX + COLS * TW) * K + 8, wx1 = cell.c === 0 ? OX * K - 8 : W - 6;
+    let big = learning && pr.acts.length > 0, ks, vs, pad, subT, w, h;
+    const size = (b, sub) => {
+      ks = b ? 30 : 24; vs = b ? 19 : 15; pad = b ? 10 : 7;
+      subT = sub ? [pr.sub, pr.acts.some(a => RHYTHM[a.verb]) ? '♪ on the beat' : null].filter(Boolean).join(' · ') : '';
+      let rowW = 0; for (const a of pr.acts) rowW += ks + 6 + measure(a.label, vs, 't') + 14; rowW = pr.acts.length ? rowW - 14 : measure(pr.note, 13, 'b');
+      w = Math.max(rowW, subT ? measure(subT, 13, 'b') : 0) + pad * 2; h = pr.acts.length ? ks + pad * 2 + (subT ? 20 : 0) : 26;
+    };
+    size(big, big);
+    if (wall && w > wx1 - wx0){ size(false, big); if (w > wx1 - wx0) size(false, false); }
     // Try spots in order: beside the barista toward the middle of the kitchen (the pour gauge sits
     // on the right), the other side, above the head, below the feet. Skip any spot that covers
     // another barista or another prompt.
     const side = cell.type === 'W' || cell.type === 'M' ? -1 : a.x < OX + COLS * TW / 2 ? 1 : -1;
     const at = s => s > 0 ? (p.x + 30) * K : (p.x - 30) * K - w, midY = (p.y - 78) * K - h / 2;
     const above = [p.x * K - w / 2, (p.y - 128) * K - h], below = [p.x * K - w / 2, (p.y + 10) * K];
-    // never cover the pour gauge (right of the barista) at water / milk
-    const spots = cell.type === 'W' || cell.type === 'M' ? [[at(-1), midY], above, below, [at(1), midY]] : [[at(side), midY], [at(-side), midY], above, below];
+    // Order of spots depends on which way the barista faces, so the card stays next to the station:
+    // back counter → beside the head (never over the pour gauge at water/milk); side counters → above the head;
+    // front counter → beside, else below.
+    const spots = cell.r === ROWS - 1 ? (cell.type === 'W' || cell.type === 'M' ? [[at(-1), midY], above, below, [at(1), midY]] : [[at(side), midY], [at(-side), midY], above, below])
+      : cell.r === 0 ? [[at(side), midY], [at(-side), midY], below, above]
+      : [above, [at(cell.c === 0 ? 1 : -1), midY], below, [at(cell.c === 0 ? -1 : 1), midY]];
     const others = players.filter(q => q !== p).map(q => ({ x: (q.x - 24) * K, y: (q.y - 122) * K, w: 48 * K, h: 126 * K }));
     const hits = (x, y) => boxes.concat(others).some(b => x < b.x + b.w + 6 && x + w + 6 > b.x && y < b.y + b.h + 6 && y + h + 6 > b.y);
-    let x, y;
-    for (const [sx, sy] of spots){ x = clamp(sx, kx0, kx1 - w); y = clamp(sy, ky0, ky1 - h); if (!hits(x, y)) break; }
+    let x, y, placed = false;
+    if (wall && w <= wx1 - wx0){
+      x = cell.c === 0 ? wx1 - w : wx0; y = clamp((cellTop(cell) + visH(cell) / 2) * K - h / 2, 80, ky1 - h);
+      placed = !hits(x, y);
+    }
+    if (!placed) for (const [sx, sy] of spots){ x = clamp(sx, kx0, kx1 - w); y = clamp(sy, ky0, ky1 - h); if (!hits(x, y)) break; }
     if (hits(x, y)){ x = clamp(spots[0][0], kx0, kx1 - w); y = clamp(midY, ky0, ky1 - h); for (let n = 0; n < 3 && hits(x, y); n++) y = clamp(y - h - 10, ky0, ky1 - h); }
     boxes.push({ x, y, w, h });
     if (!pr.acts.length){ rr(ctx, x, y, w, h, 13); ctx.fillStyle = 'rgba(255,250,240,.92)'; ctx.fill(); ink(ctx, 1.6); txt(ctx, pr.note, x + w / 2, y + h / 2 + 1, { size: 13, color: C.brown }); continue; }
     // tail toward the station
-    const tx = a.x * K, ty = (cellTop(cell) + TD * 0.4) * K;
+    // tail: from the card edge to the nearest point of the station's outline, not its center
+    const cx0 = cellX(cell) * K, cy0 = cellTop(cell) * K, cx1 = (cellX(cell) + TW) * K, cy1 = (cellTop(cell) + visH(cell)) * K;
     let tail;
-    if (ty > y + h || ty < y){ const bx = clamp(tx, x + 16, x + w - 16), by = ty > y + h ? y + h - 2 : y + 2; tail = [[bx - 9, by], [bx + 9, by], [tx, ty]]; }
-    else { const bx = tx < x ? x + 2 : x + w - 2, by = clamp(ty, y + 12, y + h - 12); tail = [[bx, by - 9], [bx, by + 9], [tx, ty]]; }
+    if (cy0 > y + h || cy1 < y){ const by = cy0 > y + h ? y + h - 2 : y + 2, bx = clamp((Math.max(x, cx0) + Math.min(x + w, cx1)) / 2, x + 18, x + w - 18); tail = [[bx - 11, by], [bx + 11, by], [clamp(bx, cx0 + 10, cx1 - 10), cy0 > y + h ? cy0 + 4 : cy1 - 4]]; }
+    else { const bx = cx0 > x + w ? x + w - 2 : x + 2, by = clamp((Math.max(y, cy0) + Math.min(y + h, cy1)) / 2, y + 12, y + h - 12); tail = [[bx, by - 11], [bx, by + 11], [cx0 > x + w ? cx0 + 4 : cx1 - 4, clamp(by, cy0 + 10, cy1 - 10)]]; }
     if (big){ ctx.save(); ctx.shadowColor = 'rgba(255,211,61,.9)'; ctx.shadowBlur = 16; rr(ctx, x, y, w, h, 10); fl(ctx, C.yellowL); ctx.restore(); }
     else { rr(ctx, x + 3, y + 4, w, h, 9); fl(ctx, 'rgba(31,26,46,.8)'); }
     poly(ctx, tail); sf(ctx, C.paper, 2.2);
