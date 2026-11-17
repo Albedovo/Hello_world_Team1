@@ -2,7 +2,6 @@
 
 A comic-style rhythm café game for one or two players on one keyboard.
 
-**[Play the latest version (V3)](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC3.html)**
 
 - [V4 — bigger U-shaped kitchen, prompt cards, pickup order bar](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC%20v4.html)
 - [V3 — V2 + skippable tutorial, 8 / 3 minute shifts](https://albedovo.github.io/Hello_world_Team1/Coffee%20Shop%20NYC3.html)
